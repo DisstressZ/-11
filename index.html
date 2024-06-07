@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RGR</title>
+</head>
+<body>
+<img src="">
+</body>
+<script type="text/javascript">
+const KEY = prompt('Key:');
+const USERNAME = prompt('Username:');
+const PASSWORD = prompt('Password:');
+
+let token = '';
+
+const login = async () => {
+  const response = await fetch('./login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({username: USERNAME, password: PASSWORD})
+  });
+
+  if (response.ok) {
+    const data = await response.json();
+    token = data.access_token;
+  } else {
+    alert('Login failed');
+    throw new Error('Login failed');
+  }
+};
+
+const img = document.querySelector('img');
+let filename = 'undefined';
+
+const loop = () => {
+  fetch('./redirect', {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    },
+    body: JSON.stringify({__: Date.now(), filename: filename, _key: KEY})
+  }).then(response => {
+    if (response.status === 401) {
+      alert('Unauthorized access');
+      throw new Error('Unauthorized access');
+    }
+    filename = response.headers.get('filename');
+    return response.blob();
+  }).then(myBlob => {
+    if (myBlob.size) {
+      const objectURL = URL.createObjectURL(myBlob);
+      img.src = objectURL;
+    } else {
+      console.log('img not change');
+    }
+  })
+  .catch(err => console.error(err));
+};
+
+const startLoop = () => {
+  setInterval(loop, 500);
+};
+
+login().then(startLoop);
+
+const postEvent = payload => {
+  console.log(payload);
+  payload._key = KEY;
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', './posted_events', true);
+  xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+  xhr.send(JSON.stringify(payload));
+  xhr.onloadend = function () {
+
+  };
+};
+
+img.addEventListener('click', event => {
+  const payload = {
+    type: event.type,
+    x: event.clientX,
+    y: event.clientY
+  };
+  postEvent(payload);
+});
+
+document.onkeydown = event => {
+  const payload = {
+    type: event.type,
+    ctrlKey: event.ctrlKey,
+    altKey: event.altKey,
+    shiftKey: event.shiftKey,
+    key: event.key
+  };
+  postEvent(payload);
+  event.preventDefault();
+};
+</script>
+</html>
